@@ -1,0 +1,25 @@
+--- /tmp/o_hetero_kernel	2026-06-16 21:57:12.815411098 +0000
++++ /tmp/e_hetero_kernel	2026-06-16 21:57:12.816795377 +0000
+@@ -1,10 +1,10 @@
+ """Graph distillation for hetero GD"""
+ 
+ import torch
+-from torch.autograd import Variable
+ import torch.nn as nn
+ import torch.nn.functional as F
+-from ..utils import distance_metric, min_cosine
++# DMD-VA: local import (was `from ..utils import ...`); device-agnostic metrics.
++from .misc import distance_metric, min_cosine
+ 
+ class DistillationKernel(nn.Module):
+   """Graph Distillation kernel.
+@@ -24,7 +24,8 @@
+     self.to_idx = to_idx
+     self.from_idx = from_idx
+     self.alpha = alpha
+-    self.gd_prior = Variable(torch.FloatTensor(gd_prior).cuda())
++    # DMD-VA: register as a buffer so it follows .to(device) (was Variable(...).cuda()).
++    self.register_buffer('gd_prior', torch.tensor(gd_prior, dtype=torch.float32))
+     self.gd_reg = gd_reg
+     self.w_losses = w_losses
+     self.metric = metric

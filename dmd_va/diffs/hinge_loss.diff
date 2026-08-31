@@ -1,0 +1,21 @@
+--- /tmp/o_hinge_loss	2026-06-16 21:57:12.836794677 +0000
++++ /tmp/e_hinge_loss	2026-06-16 21:57:12.837562462 +0000
+@@ -26,13 +26,16 @@
+         t_ids = ids.view(1, B).repeat(B, 1) # B X B 
+ 
+         cosine = self.compute_cosine(s, t) # B**2
+-        equal_mask = torch.eye(B, dtype=torch.bool) # B X B
++        equal_mask = torch.eye(B, dtype=torch.bool, device=feats.device) # DMD-VA: device-safe (was CPU)
+         s_ids = s_ids[~equal_mask].view(B, B-1) # B X (B-1)
+         t_ids = t_ids[~equal_mask].view(B, B-1) # B X (B-1)
+         cosine = cosine.view(B, B)[~equal_mask].view(B, B-1) # B X (B-1)
+ 
+         sim_mask = (s_ids == t_ids) # B X (B-1)
+-        margin = 0.15 * abs(s_ids - t_ids)#[~sim_mask].view(B, B - 3)
++        # DMD-VA: constant margin for any different-class pair. Emotion classes
++        # have no ordinal distance, so the official 0.15*|label_i-label_j| (for
++        # sentiment scores) is replaced by a flat 0.15 on different-class pairs.
++        margin = 0.15 * (s_ids != t_ids).float()
+ 
+         loss = 0
+         loss_num = 0

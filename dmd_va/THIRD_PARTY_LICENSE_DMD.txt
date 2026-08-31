@@ -1,6 +1,11 @@
+The files in this package marked as adapted or copied from the official DMD
+release originate from https://github.com/mdswyz/DMD and are covered by the
+licence below.
+--------------------------------------------------------------------------
+
 MIT License
 
-Copyright (c) 2026 Nikolas Ziartis
+Copyright (c) 2023 mdswyz
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

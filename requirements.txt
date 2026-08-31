@@ -1,0 +1,23 @@
+# Only the versions below were captured at run time (run_metadata.json):
+#   Python 3.10.12, torch 2.6.0+cu124, CUDA 12.4, cuDNN 90100
+# The remaining packages are listed unpinned rather than pinned to a guess.
+
+torch==2.6.0
+numpy
+pandas
+scikit-learn
+joblib
+tqdm
+
+# frozen backbones (WavLM-base+, DINOv2-base)
+transformers
+
+# feature extraction only (features/)
+opencv-python-headless
+librosa
+facenet-pytorch
+
+# GPU selection helper (emoe_va/utils/functions.py)
+pynvml
+
+# NOTE: ffmpeg must be available on PATH for audio extraction in features/.

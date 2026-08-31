@@ -1,0 +1,81 @@
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+# DMD-VA: local import (was `from ..utils import ...`); device-agnostic metrics.
+from .misc import distance_metric, min_cosine
+
+class DistillationKernel(nn.Module):
+
+  def __init__(self, n_classes, hidden_size, gd_size, to_idx, from_idx,
+               gd_prior, gd_reg, w_losses, metric, alpha, hyp_params):
+    super(DistillationKernel, self).__init__()
+    self.W_logit = nn.Linear(n_classes, gd_size)
+    self.W_repr = nn.Linear(hidden_size, gd_size)
+    self.W_edge = nn.Linear(gd_size * 4, 1)
+
+    self.gd_size = gd_size
+    self.to_idx = to_idx
+    self.from_idx = from_idx
+    self.alpha = alpha
+    # DMD-VA: register as a buffer so it follows .to(device) (was Variable(...).cuda()).
+    self.register_buffer('gd_prior', torch.tensor(gd_prior, dtype=torch.float32))
+    self.gd_reg = gd_reg
+    self.w_losses = w_losses
+    self.metric = metric
+    self.hyp_params = hyp_params
+
+
+  def forward(self, logits, reprs):
+    n_modalities, batch_size = logits.size()[:2]
+    z_logits = self.W_logit(logits.view(n_modalities * batch_size, -1))
+    z_reprs = self.W_repr(reprs.view(n_modalities * batch_size, -1))
+    z = torch.cat(
+        (z_logits, z_reprs), dim=1).view(n_modalities, batch_size,
+                                         self.gd_size * 2)
+    edges = []
+    for j in self.to_idx:
+      for i in self.from_idx:
+        if i == j:
+          continue
+        else:
+
+          e = self.W_edge(torch.cat((z[j], z[i]), dim=1))
+          edges.append(e)
+    edges = torch.cat(edges, dim=1)
+    edges_origin = edges.sum(0).unsqueeze(0).transpose(0, 1)
+    edges = F.softmax(edges * self.alpha, dim=1).transpose(0, 1)
+    return edges, edges_origin
+
+
+  def distillation_loss(self, logits, reprs, edges):
+    loss_reg = (edges.mean(1) - self.gd_prior).pow(2).sum() * self.gd_reg
+    loss_logit, loss_repr = 0, 0
+    x = 0
+    for j in self.to_idx:
+      for i, idx in enumerate(self.from_idx):
+        if i == j:
+          continue
+        else:
+          w_distill = edges[x] + self.gd_prior[x]
+
+          loss_logit += self.w_losses[0] * distance_metric(
+            logits[j], logits[idx], self.metric, w_distill)
+          loss_repr += self.w_losses[1] * min_cosine(
+            reprs[j], reprs[idx], self.metric, w_distill)
+          x = x + 1
+    return loss_reg, loss_logit, loss_repr
+
+
+def get_distillation_kernel(n_classes,
+                            hidden_size,
+                            gd_size,
+                            to_idx,
+                            from_idx,
+                            gd_prior,
+                            gd_reg,
+                            w_losses,
+                            metric,
+                            alpha=1 / 8):
+  return DistillationKernel(n_classes, hidden_size, gd_size, to_idx, from_idx,
+                            gd_prior, gd_reg, w_losses, metric, alpha)

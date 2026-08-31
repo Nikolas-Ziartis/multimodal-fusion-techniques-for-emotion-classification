@@ -1,0 +1,28 @@
+--- /tmp/o_misc	2026-06-16 21:57:12.829545320 +0000
++++ /tmp/e_misc	2026-06-16 21:57:12.829562462 +0000
+@@ -60,8 +60,11 @@
+   return dist
+ 
+ def min_cosine(student, teacher, option, weights=None):
+-  cosine = torch.nn.CosineEmbeddingLoss()
+-  dists = cosine(student, teacher.detach(), torch.tensor([-1]).cuda())
++  # DMD-VA: device-agnostic target (was .cuda()); reduction='none' so the
++  # per-edge distillation weights actually apply per-sample.
++  cosine = torch.nn.CosineEmbeddingLoss(reduction='none')
++  target = torch.tensor([-1.0], device=student.device)
++  dists = cosine(student, teacher.detach(), target)
+   if weights is None:
+     dist = dists.mean()
+   else:
+@@ -93,8 +96,10 @@
+     # assert weights is None
+     T = 8
+     # averaged for each minibatch
++    # DMD-VA: explicit dim=1 over classes (release relied on deprecated
++    # implicit-dim softmax, which warns/breaks on modern torch).
+     dist = F.kl_div(
+-        F.log_softmax(student / T), F.softmax(teacher.detach() / T)) * (
++        F.log_softmax(student / T, dim=1), F.softmax(teacher.detach() / T, dim=1)) * (
+             T * T)
+     return dist
+   else:
